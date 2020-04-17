@@ -1,0 +1,23 @@
+- hosts: all
+  tasks:
+    - name: 'Exemplo de execução no shell usando ansible'
+      shell: 'echo hello > /vagrant/world.txt'
+
+    - name: 'Instala php7.2'
+      apt:
+        name: php7.2
+        state: latest
+      become: 'yes'
+
+    - name: 'Instala o apache2'
+      apt:
+        name: apache2
+        state: latest
+      become: 'yes'
+
+    - name: 'Instala o modphp'
+      apt:
+        name: libapache2-mod-php7.2
+        state: latest
+      become: 'yes'
+

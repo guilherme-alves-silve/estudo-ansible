@@ -1,0 +1,120 @@
+- hosts: all
+  handlers:
+    - name: restart mysql
+      service:
+        name: mysql
+        state: restarted
+      become: 'yes'
+
+    - name: restart apache
+      service:
+          name: apache2
+          state: restarted
+      become: 'yes'
+
+  tasks:
+    - name: 'Atualiza apt se necessário'
+      apt:
+        upgrade: 'yes'
+        update_cache: yes
+        cache_valid_time: 86400 #Um dia
+      become: 'yes'
+
+    - name: 'Instala pacotes de dependências do sistema operacional'
+      apt:
+        name: [ 
+          'php7.2',
+          'apache2',
+          'libapache2-mod-php7.2',
+          'php7.2-gd',
+          'libssh2-1',
+          'php-ssh2', 
+          'mysql-server-5.7', 
+          'mysql-client-5.7',
+          'python3.7',
+          'python3-pip',
+          'python3-mysqldb',
+          'php7.2-mysql'
+        ]
+        state: latest
+      become: 'yes'
+
+    - name: 'Garante instalação dos modulos do Python'
+      pip: 
+        name: 'pymysql'
+        state: present
+      become: 'yes'
+
+    - name: 'Reinicia o MySQL'
+      service:
+        name: mysql
+        state: restarted
+      become: 'yes'
+
+    - name: 'Copiar arquivo mysqld.cnf'
+      copy:
+        src: mysqld.cnf
+        dest: /etc/mysql/mysql.conf.d/mysqld.cnf
+        owner: root
+        group: root
+        mode: 0644
+      become: 'yes'
+      notify:
+        - restart mysql
+
+    - name: 'Configura usuário do mysql'
+      shell: mysql -e "CREATE USER 'phpuser'@'%' IDENTIFIED BY 'pass';"
+      ignore_errors: 'yes'
+      become: 'yes'
+
+    - name: 'Adiciona permissão de usuário do mysql'
+      shell: mysql -e "GRANT ALL PRIVILEGES ON *.* TO 'phpuser'@'%';"
+      ignore_errors: 'yes'
+      become: 'yes'
+
+    - name: 'Cria banco de dados MySQL'
+      mysql_db: 
+        name: wordpress_db
+        login_user: phpuser
+        login_password: pass 
+        state: present
+      become: 'yes'
+
+    - name: 'Baixa o arquivo de instalação do Wordpress'
+      get_url:
+        url: 'https://wordpress.org/latest.tar.gz'
+        dest: '/tmp/wordpress.tar.gz'
+
+    - name: 'Descompacta o Wordpress'
+      unarchive:
+        src: '/tmp/wordpress.tar.gz'
+        dest: '/var/www/'
+        remote_src: 'yes'
+      become: 'yes'
+
+    - name: 'Configura Wordpress'
+      copy:
+        src: /var/www/wordpress/wp-config-sample.php
+        dest: '/var/www/wordpress/wp-config.php'
+        remote_src: 'yes'
+      become: 'yes'
+
+    - name: 'Configura o wp-config para utilizar o banco de dados'
+      replace:
+        path: '/var/www/wordpress/wp-config.php'
+        regexp: "{{ item.regex }}"
+        replace: '{{ item.value }}'
+        backup: 'yes'
+      with_items:
+        - { regex: 'database_name_here', value: 'wordpress_db' }
+        - { regex: 'username_here', value: 'phpuser' }
+        - { regex: 'password_here', value: 'pass' }
+      become: 'yes'
+
+    - name: 'Configura o Apache para servir o Wordpress'
+      copy:
+        src: 'files/000-default.conf'
+        dest: '/etc/apache2/sites-available/000-default.conf'
+      become: 'yes'
+      notify: 
+        - restart apache

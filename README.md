@@ -4,5 +4,5 @@ Estudo do curso alura de ansible (https://www.alura.com.br/curso-online-infraest
 
 # versões
 
-Vagrant 2.2.7
+Vagrant 2.2.7\
 ansible 2.9.1
